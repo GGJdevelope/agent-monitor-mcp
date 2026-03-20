@@ -58,15 +58,18 @@ To connect to this MCP server in OpenCode, add the following to your `opencode.j
 
 ### Available Tools
 
-- `report_status(agent_id, run_id, task_name, status, progress, message, metadata)`: Updates agent status.
-- `get_all_status()`: Returns current snapshots of all agents.
-- `get_agent_status(agent_id)`: Returns current snapshot of a specific agent.
+- `report_status(agent_id, run_id, task_name, status, progress, message, metadata, instance_id=None, branch=None, working_dir=None)`: Updates agent status.
+  - `instance_id`: A unique identifier for the agent instance. If omitted, one is synthesized from `agent_id` and `run_id`.
+  - `branch`: The current git branch name.
+  - `working_dir`: The absolute path to the agent's working directory.
+- `get_all_status()`: Returns current snapshots of all agent instances.
+- `get_agent_status(instance_id)`: Returns current snapshot of a specific agent instance.
 
 ### Recommended Prompt for Primary Agents
 
 Primary or orchestrator agents should instruct subagents to call `report_status` when a task starts, during progress updates, on completion, and on failure. Use canonical lowercase status values: `running`, `completed`, `failed`, `cancelled`, or `queued`.
 
-The orchestrator can use `get_all_status()` or `get_agent_status(agent_id)` to monitor workers.
+The orchestrator can use `get_all_status()` or `get_agent_status(instance_id)` to monitor workers.
 
 ```markdown
 When executing tasks, use the `agent-monitor` MCP server to report your status:
@@ -86,8 +89,19 @@ You must use the `agent-monitor` MCP tool to report status for every non-trivial
 2.  **Updates:** Send progress updates (0-100) and messages after each major phase, delegation, or every few meaningful steps.
 3.  **Stalls:** If a task stalls or awaits user input, report it in the `message` while remaining `status='running'`.
 4.  **Finish:** Conclude with `status='completed'` or `status='failed'`.
-5.  **Required Fields:** Every call must include `agent_id`, `run_id` (must include the current branch name), `task_name`, `status`, `progress`, and `message`.
+5.  **Required Fields:** Every call must include `agent_id`, `run_id`, `task_name`, `status`, `progress`, and `message`. 
+6.  **Context (Strongly Recommended):** Include `branch` (current git branch) and `working_dir` (absolute path to current directory) to distinguish instances across branches/projects.
 ```
+
+## Agent Identity & Privacy
+
+The monitor uses an `instance_id` (explicit or synthesized) as the primary key for state and history. This allows the system to distinguish multiple instances of the same `agent_id` (e.g., running on different branches or in different working directories).
+
+### Privacy Boundary
+
+- **Dashboard List & CLI**: Show only `agent_id`, `branch`, and a **compact location label** (the last two path components of `working_dir` where possible, rather than just the basename).
+- **Instance Details**: Show the full absolute `working_dir`, `instance_id`, and other metadata.
+- **API**: The `/api/agents` list endpoint provides compact summary data (including `location_label`) and excludes full paths; canonical full details live at `/api/agents/instances/{instance_id}`.
 
 ## CLI Monitor
 

@@ -17,12 +17,14 @@
             <table class="min-w-full leading-normal">
                 <thead>
                     <tr>
-                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Agent ID</th>
-                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Run ID / Task Name</th>
-                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Progress</th>
-                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Message</th>
-                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Updated At</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Agent ID</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Branch</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Run / Task</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Progress</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Message</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Updated</th>
                     </tr>
                 </thead>
                 <tbody id="agent-table-body">
@@ -34,6 +36,8 @@
 
     <script>
         const agents = new Map();
+        const expandedRows = new Set();
+        const instanceDetails = new Map();
 
         function getStatusColor(status) {
             switch (status.toLowerCase()) {
@@ -47,6 +51,31 @@
             }
         }
 
+        async function toggleDetails(instanceId) {
+            if (expandedRows.has(instanceId)) {
+                expandedRows.delete(instanceId);
+                renderAgents();
+            } else {
+                expandedRows.add(instanceId);
+                instanceDetails.set(instanceId, { loading: true });
+                renderAgents();
+                
+                try {
+                    const response = await fetch(`/api/agents/instances/${instanceId}`);
+                    if (response.ok) {
+                        const details = await response.json();
+                        instanceDetails.set(instanceId, details);
+                    } else {
+                        instanceDetails.set(instanceId, { error: true });
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch instance details", err);
+                    instanceDetails.set(instanceId, { error: true });
+                }
+                renderAgents();
+            }
+        }
+
         function renderAgents() {
             const tbody = document.getElementById('agent-table-body');
             tbody.innerHTML = '';
@@ -55,65 +84,110 @@
                 new Date(b.updated_at) - new Date(a.updated_at)
             );
 
+            if (agents.size === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="px-5 py-10 text-center text-gray-500">No agents reporting yet</td></tr>';
+                return;
+            }
+
             sortedAgents.forEach(agent => {
                 const row = document.createElement('tr');
-                row.className = 'hover:bg-gray-50 transition-colors';
+                row.className = 'hover:bg-gray-50 transition-colors cursor-pointer';
+                const instanceId = agent.instance_id || agent.agent_id;
+                row.onclick = () => toggleDetails(instanceId);
                 
                 const timeStr = new Date(agent.updated_at).toLocaleTimeString();
+                const shortLocation = agent.location_label || '-';
+                const branchStr = agent.branch || '-';
                 
                 row.innerHTML = `
-                    <td class="px-5 py-5 border-b border-gray-200 text-sm">
-                        <p class="text-gray-900 whitespace-no-wrap font-mono">${agent.agent_id}</p>
+                    <td class="px-3 py-3 border-b border-gray-200 text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap font-mono truncate w-24" title="${agent.agent_id}">${agent.agent_id}</p>
                     </td>
-                    <td class="px-5 py-5 border-b border-gray-200 text-sm">
-                        <p class="text-gray-900 whitespace-no-wrap font-bold">${agent.task_name}</p>
-                        <p class="text-gray-600 text-xs font-mono">${agent.run_id}</p>
+                    <td class="px-3 py-3 border-b border-gray-200 text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap" title="${shortLocation}">${shortLocation}</p>
                     </td>
-                    <td class="px-5 py-5 border-b border-gray-200 text-sm">
-                        <span class="relative inline-block px-3 py-1 font-semibold leading-tight rounded-full ${getStatusColor(agent.status)}">
+                    <td class="px-3 py-3 border-b border-gray-200 text-sm">
+                        <span class="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">${branchStr}</span>
+                    </td>
+                    <td class="px-3 py-3 border-b border-gray-200 text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap font-bold truncate w-32" title="${agent.task_name}">${agent.task_name}</p>
+                        <p class="text-gray-600 text-xs font-mono truncate w-32" title="${agent.run_id}">${agent.run_id}</p>
+                    </td>
+                    <td class="px-3 py-3 border-b border-gray-200 text-sm">
+                        <span class="relative inline-block px-2 py-1 font-semibold leading-tight rounded-full text-xs ${getStatusColor(agent.status)}">
                             ${agent.status}
                         </span>
                     </td>
-                    <td class="px-5 py-5 border-b border-gray-200 text-sm">
-                        <div class="w-full bg-gray-200 rounded-full h-2.5 mb-1">
-                            <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${agent.progress}%"></div>
+                    <td class="px-3 py-3 border-b border-gray-200 text-sm">
+                        <div class="w-20 bg-gray-200 rounded-full h-2 mb-1">
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${agent.progress}%"></div>
                         </div>
                         <p class="text-gray-600 text-xs">${agent.progress}%</p>
                     </td>
-                    <td class="px-5 py-5 border-b border-gray-200 text-sm">
-                        <p class="text-gray-900 whitespace-no-wrap">${agent.message || '-'}</p>
+                    <td class="px-3 py-3 border-b border-gray-200 text-sm">
+                        <p class="text-gray-900 truncate w-48" title="${agent.message || ''}">${agent.message || '-'}</p>
                     </td>
-                    <td class="px-5 py-5 border-b border-gray-200 text-sm text-right">
-                        <p class="text-gray-900 whitespace-no-wrap">${timeStr}</p>
+                    <td class="px-3 py-3 border-b border-gray-200 text-sm text-right">
+                        <p class="text-gray-900 whitespace-no-wrap text-xs">${timeStr}</p>
                     </td>
                 `;
                 tbody.appendChild(row);
-            });
 
-            if (agents.size === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-10 text-center text-gray-500">No agents reporting yet</td></tr>';
-            }
+                if (expandedRows.has(instanceId)) {
+                    const detailsRow = document.createElement('tr');
+                    detailsRow.className = 'bg-gray-50 border-b border-gray-200';
+                    const details = instanceDetails.get(instanceId);
+                    
+                    if (details && !details.loading && !details.error) {
+                        detailsRow.innerHTML = `
+                            <td colspan="8" class="px-4 py-4">
+                                <div class="grid grid-cols-2 gap-4 text-sm">
+                                    <div><span class="font-bold text-gray-600">Instance ID:</span> <span class="font-mono">${details.instance_id || 'N/A'}</span></div>
+                                    <div><span class="font-bold text-gray-600">Agent ID:</span> <span class="font-mono">${details.agent_id}</span></div>
+                                    <div><span class="font-bold text-gray-600">Working Dir:</span> <span class="break-all">${details.working_dir || 'N/A'}</span></div>
+                                    <div><span class="font-bold text-gray-600">Branch:</span> <span>${details.branch || 'N/A'}</span></div>
+                                    <div><span class="font-bold text-gray-600">Run ID:</span> <span class="font-mono">${details.run_id}</span></div>
+                                    <div><span class="font-bold text-gray-600">Task Name:</span> <span>${details.task_name}</span></div>
+                                    <div><span class="font-bold text-gray-600">First Seen:</span> <span>${details.first_seen_at ? new Date(details.first_seen_at).toLocaleString() : 'N/A'}</span></div>
+                                    <div><span class="font-bold text-gray-600">Updated At:</span> <span>${new Date(details.updated_at).toLocaleString()}</span></div>
+                                </div>
+                            </td>
+                        `;
+                    } else if (details && details.error) {
+                        detailsRow.innerHTML = `
+                            <td colspan="8" class="px-4 py-4 text-center text-red-500">
+                                Failed to load instance details
+                            </td>
+                        `;
+                    } else {
+                        detailsRow.innerHTML = `
+                            <td colspan="8" class="px-4 py-4 text-center text-gray-500">
+                                Loading details...
+                            </td>
+                        `;
+                    }
+                    tbody.appendChild(detailsRow);
+                }
+            });
         }
 
-        // Fetch initial state
         async function fetchInitialState() {
             try {
                 const response = await fetch('/api/agents');
                 const data = await response.json();
-                data.forEach(agent => agents.set(agent.agent_id, agent));
+                data.forEach(agent => agents.set(agent.instance_id || agent.agent_id, agent));
                 renderAgents();
             } catch (err) {
                 console.error("Failed to fetch initial state", err);
             }
         }
 
-        // Connect to SSE
         function connectSSE() {
             const eventSource = new EventSource('/api/stream');
             
             eventSource.addEventListener('status_update', (event) => {
                 const data = JSON.parse(event.data);
-                agents.set(data.agent_id, data);
+                agents.set(data.instance_id || data.agent_id, data);
                 renderAgents();
             });
 
