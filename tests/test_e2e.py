@@ -1,8 +1,127 @@
 import pytest
-import asyncio
-import json
+from datetime import datetime, timezone, timedelta
 from httpx import AsyncClient
 from app.models.status import StatusEvent, AgentStatus
+from app.config import settings
+
+@pytest.mark.asyncio
+async def test_startup_retention_cleanup(db_path):
+    """
+    Integration test for startup retention cleanup.
+    """
+    from app.repositories.status_repository import StatusRepository
+    from app.bootstrap import bootstrap_service
+    
+    # 1. Manually prepare database with old data
+    repo = StatusRepository(db_path)
+    now = datetime.now(timezone.utc)
+    old_time = now - timedelta(seconds=100)
+    
+    with repo._get_connection() as conn:
+        conn.execute(
+            "INSERT INTO agent_status_events (agent_id, run_id, task_name, status, progress, message, reported_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("old-agent", "run-old", "task-old", "running", 10, "old", old_time.isoformat(), "{}")
+        )
+        conn.execute(
+            "INSERT INTO agent_current_status (agent_id, run_id, task_name, status, progress, message, reported_at, first_seen_at, updated_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("old-agent", "run-old", "task-old", "running", 10, "old", old_time.isoformat(), old_time.isoformat(), old_time.isoformat(), "{}")
+        )
+        conn.commit()
+
+    # 2. Configure settings for test (60s retention)
+    original_db_url = settings.DATABASE_URL
+    original_retention = settings.STATUS_RETENTION_SECONDS
+    settings.DATABASE_URL = f"sqlite:///{db_path}"
+    settings.STATUS_RETENTION_SECONDS = 60
+    
+    try:
+        # 3. Bootstrap (this should trigger cleanup)
+        service = bootstrap_service()
+        
+        # 4. Verify old data is gone
+        assert len(service.repository.get_events("old-agent")) == 0
+        assert service.repository.get_snapshot("old-agent") is None
+    finally:
+        # Restore settings
+        settings.DATABASE_URL = original_db_url
+        settings.STATUS_RETENTION_SECONDS = original_retention
+
+@pytest.mark.asyncio
+async def test_fastapi_lifespan_integration_cleanup(db_path):
+    """
+    Integration test for FastAPI lifespan cleanup.
+    """
+    from app.repositories.status_repository import StatusRepository
+    from fastapi import FastAPI
+    from app.main import lifespan
+    from httpx import ASGITransport
+    
+    # 1. Manually prepare database with old data
+    repo = StatusRepository(db_path)
+    now = datetime.now(timezone.utc)
+    old_time = now - timedelta(seconds=100)
+    
+    with repo._get_connection() as conn:
+        conn.execute(
+            "INSERT INTO agent_status_events (agent_id, run_id, task_name, status, progress, message, reported_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("lifespan-agent", "run-1", "task-1", "running", 10, "old", old_time.isoformat(), "{}")
+        )
+        conn.execute(
+            "INSERT INTO agent_current_status (agent_id, run_id, task_name, status, progress, message, reported_at, first_seen_at, updated_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("lifespan-agent", "run-1", "task-1", "running", 10, "old", old_time.isoformat(), old_time.isoformat(), old_time.isoformat(), "{}")
+        )
+        conn.commit()
+
+    # 2. Configure settings for test
+    original_db_url = settings.DATABASE_URL
+    original_retention = settings.STATUS_RETENTION_SECONDS
+    settings.DATABASE_URL = f"sqlite:///{db_path}"
+    settings.STATUS_RETENTION_SECONDS = 60
+    
+    try:
+        # Create a FRESH app instance with the SAME lifespan
+        test_app = FastAPI(lifespan=lifespan)
+        
+        # 3. Explicitly trigger lifespan events
+        async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test"):
+            # If the transport doesn't trigger lifespan, try doing it manually via the context manager
+            async with lifespan(test_app):
+                # At this point, lifespan has run
+                service = test_app.state.status_service
+                
+                # 4. Verify old data is gone
+                assert len(service.repository.get_events("lifespan-agent")) == 0
+                assert service.repository.get_snapshot("lifespan-agent") is None
+    finally:
+        # Restore settings
+        settings.DATABASE_URL = original_db_url
+        settings.STATUS_RETENTION_SECONDS = original_retention
+
+@pytest.mark.asyncio
+async def test_bootstrap_fails_on_sql_error(db_path, monkeypatch):
+    """
+    Test that bootstrap fails fast when pruning raises a sqlite-related error.
+    """
+    from app.repositories.status_repository import StatusRepository
+    from app.bootstrap import bootstrap_service
+    import sqlite3
+
+    def mock_prune_expired_data(self, cutoff):
+        raise sqlite3.Error("Simulated SQL error")
+
+    monkeypatch.setattr(StatusRepository, "prune_expired_data", mock_prune_expired_data)
+
+    original_db_url = settings.DATABASE_URL
+    original_retention = settings.STATUS_RETENTION_SECONDS
+    settings.DATABASE_URL = f"sqlite:///{db_path}"
+    settings.STATUS_RETENTION_SECONDS = 60
+
+    try:
+        with pytest.raises(sqlite3.Error, match="Simulated SQL error"):
+            bootstrap_service()
+    finally:
+        settings.DATABASE_URL = original_db_url
+        settings.STATUS_RETENTION_SECONDS = original_retention
 
 @pytest.mark.asyncio
 async def test_api_health(client: AsyncClient):

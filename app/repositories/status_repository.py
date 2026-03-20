@@ -1,8 +1,11 @@
 import sqlite3
 import json
+import logging
 from typing import List, Optional
 from datetime import datetime, timezone
 from app.models.status import StatusEvent, AgentStatus, AgentState
+
+logger = logging.getLogger(__name__)
 
 class StatusRepository:
     def __init__(self, db_path: str):
@@ -54,7 +57,47 @@ class StatusRepository:
             """)
             
             conn.execute("CREATE INDEX IF NOT EXISTS idx_events_agent_run ON agent_status_events (agent_id, run_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_events_reported_at ON agent_status_events (reported_at)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_current_updated_at ON agent_current_status (updated_at)")
             conn.commit()
+
+    def prune_expired_data(self, cutoff: datetime) -> dict[str, int]:
+        """
+        Prune rows strictly older than the cutoff datetime.
+        - Events are pruned by 'reported_at'
+        - Snapshots are pruned by 'updated_at' (as per plan)
+        Returns a dictionary with 'deleted_events' and 'deleted_snapshots' counts.
+        """
+        cutoff_iso = cutoff.isoformat()
+
+        logger.info(f"Pruning agent data older than {cutoff_iso}")
+
+        try:
+            with self._get_connection() as conn:
+                # Use a single transaction for atomicity
+                with conn:
+                    # Prune events older than cutoff
+                    cursor = conn.execute(
+                        "DELETE FROM agent_status_events WHERE reported_at < ?",
+                        (cutoff_iso,)
+                    )
+                    deleted_events = cursor.rowcount
+
+                    # Prune current status snapshots older than cutoff
+                    cursor = conn.execute(
+                        "DELETE FROM agent_current_status WHERE updated_at < ?",
+                        (cutoff_iso,)
+                    )
+                    deleted_snapshots = cursor.rowcount
+
+            logger.info(f"Pruned {deleted_events} events and {deleted_snapshots} snapshots")
+            return {
+                "deleted_events": deleted_events,
+                "deleted_snapshots": deleted_snapshots
+            }
+        except sqlite3.Error as e:
+            logger.error(f"Failed to prune expired agent data: {e}")
+            raise
 
     def add_event(self, event: StatusEvent):
         with self._get_connection() as conn:

@@ -1,11 +1,11 @@
 import pytest
 import os
 import tempfile
-from fastapi import FastAPI
 from httpx import AsyncClient, ASGITransport
 from app.repositories.status_repository import StatusRepository
 from app.services.status_service import StatusService
 from app.main import app as main_app
+from app import mcp_server
 
 @pytest.fixture
 def db_path():
@@ -14,6 +14,13 @@ def db_path():
     yield path
     if os.path.exists(path):
         os.unlink(path)
+
+@pytest.fixture(autouse=True)
+def reset_mcp_singleton():
+    """Reset the MCP server singleton before each test."""
+    mcp_server._status_service = None
+    yield
+    mcp_server._status_service = None
 
 @pytest.fixture
 def repository(db_path):

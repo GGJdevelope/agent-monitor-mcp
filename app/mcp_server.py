@@ -2,8 +2,7 @@ from typing import List, Optional, Any
 from fastmcp import FastMCP
 from app.models.status import AgentStatus, StatusEvent, AgentState
 from app.services.status_service import StatusService
-from app.repositories.status_repository import StatusRepository
-from app.config import settings
+from app.bootstrap import bootstrap_service
 
 mcp = FastMCP("Agent Monitor")
 
@@ -12,9 +11,7 @@ _status_service: Optional[StatusService] = None
 def get_service() -> StatusService:
     global _status_service
     if _status_service is None:
-        repository = StatusRepository(settings.DATABASE_URL)
-        repository._init_db()
-        _status_service = StatusService(repository, stale_threshold_seconds=settings.STALE_THRESHOLD_SECONDS)
+        _status_service = bootstrap_service()
     return _status_service
 
 @mcp.tool()
@@ -58,4 +55,6 @@ async def get_agent_status(agent_id: str) -> Optional[AgentState]:
     return get_service().get_agent_state(agent_id)
 
 if __name__ == "__main__":
+    # Eagerly bootstrap on actual MCP server process startup
+    get_service()
     mcp.run()

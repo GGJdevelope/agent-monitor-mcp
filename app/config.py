@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import List
+from pydantic import Field
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./agent_monitor.db"
@@ -8,6 +9,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["*"]
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+    STATUS_RETENTION_SECONDS: int = Field(default=0, ge=0)
 
     model_config = {
         "env_file": ".env",

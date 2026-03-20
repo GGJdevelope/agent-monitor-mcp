@@ -141,7 +141,20 @@ The application generates SQLite runtime files in the project root:
 - `agent_monitor.db-wal`
 - `agent_monitor.db-shm`
 
-These are excluded from version control via `.gitignore`. To reset the system state, stop the server and delete these files.
+These are excluded from version control via `.gitignore`. 
+
+#### Automatic Startup Retention
+
+You can configure automatic cleanup of old data at startup by setting `STATUS_RETENTION_SECONDS` in your `.env` file. 
+
+- If set to a positive integer (e.g., `86400` for 24 hours), the server will prune both event history and current status snapshots strictly older than the cutoff upon initialization.
+- Events are pruned based on their `reported_at` timestamp.
+- Current status snapshots are pruned based on their `updated_at` timestamp (last seen).
+- If set to `0` (default), automatic cleanup is disabled.
+
+#### Manual Reset
+
+To manually reset the system state, stop the server and delete the `.db*` files.
 
 ## Limitations & Human Review
 
