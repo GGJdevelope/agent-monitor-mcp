@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Monitor Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Agent Monitor Dashboard</h1>
+            <p class="text-gray-600">Real-time status of all active agents</p>
+        </header>
+
+        <div class="bg-white shadow-md rounded-lg overflow-hidden">
+            <table class="min-w-full leading-normal">
+                <thead>
+                    <tr>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Agent ID</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Run ID / Task Name</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Progress</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Message</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Updated At</th>
+                    </tr>
+                </thead>
+                <tbody id="agent-table-body">
+                    <!-- Data populated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const agents = new Map();
+
+        function getStatusColor(status) {
+            switch (status.toLowerCase()) {
+                case 'queued': return 'bg-gray-200 text-gray-800';
+                case 'running': return 'bg-blue-100 text-blue-800';
+                case 'completed': return 'bg-green-100 text-green-800';
+                case 'failed': return 'bg-red-100 text-red-800';
+                case 'cancelled': return 'bg-yellow-100 text-yellow-800';
+                case 'stale': return 'bg-orange-100 text-orange-800';
+                default: return 'bg-gray-100 text-gray-800';
+            }
+        }
+
+        function renderAgents() {
+            const tbody = document.getElementById('agent-table-body');
+            tbody.innerHTML = '';
+            
+            const sortedAgents = Array.from(agents.values()).sort((a, b) => 
+                new Date(b.updated_at) - new Date(a.updated_at)
+            );
+
+            sortedAgents.forEach(agent => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition-colors';
+                
+                const timeStr = new Date(agent.updated_at).toLocaleTimeString();
+                
+                row.innerHTML = `
+                    <td class="px-5 py-5 border-b border-gray-200 text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap font-mono">${agent.agent_id}</p>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap font-bold">${agent.task_name}</p>
+                        <p class="text-gray-600 text-xs font-mono">${agent.run_id}</p>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 text-sm">
+                        <span class="relative inline-block px-3 py-1 font-semibold leading-tight rounded-full ${getStatusColor(agent.status)}">
+                            ${agent.status}
+                        </span>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 text-sm">
+                        <div class="w-full bg-gray-200 rounded-full h-2.5 mb-1">
+                            <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${agent.progress}%"></div>
+                        </div>
+                        <p class="text-gray-600 text-xs">${agent.progress}%</p>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 text-sm">
+                        <p class="text-gray-900 whitespace-no-wrap">${agent.message || '-'}</p>
+                    </td>
+                    <td class="px-5 py-5 border-b border-gray-200 text-sm text-right">
+                        <p class="text-gray-900 whitespace-no-wrap">${timeStr}</p>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            if (agents.size === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-10 text-center text-gray-500">No agents reporting yet</td></tr>';
+            }
+        }
+
+        // Fetch initial state
+        async function fetchInitialState() {
+            try {
+                const response = await fetch('/api/agents');
+                const data = await response.json();
+                data.forEach(agent => agents.set(agent.agent_id, agent));
+                renderAgents();
+            } catch (err) {
+                console.error("Failed to fetch initial state", err);
+            }
+        }
+
+        // Connect to SSE
+        function connectSSE() {
+            const eventSource = new EventSource('/api/stream');
+            
+            eventSource.addEventListener('status_update', (event) => {
+                const data = JSON.parse(event.data);
+                agents.set(data.agent_id, data);
+                renderAgents();
+            });
+
+            eventSource.onerror = (err) => {
+                console.error("SSE connection error, retrying...", err);
+                eventSource.close();
+                setTimeout(connectSSE, 3000);
+            };
+        }
+
+        fetchInitialState();
+        connectSSE();
+    </script>
+</body>
+</html>
