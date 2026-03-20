@@ -4,11 +4,9 @@ A hybrid monitoring system for agents with MCP status ingestion, a FastAPI REST 
 
 ## Setup
 
-1. Create a virtual environment and install dependencies:
+1. Install dependencies using Poetry:
    ```bash
-   python -m venv venv
-   source venv/bin/activate
-   pip install -e .
+   poetry install
    ```
 
 2. Configure environment variables (optional):
@@ -20,7 +18,7 @@ A hybrid monitoring system for agents with MCP status ingestion, a FastAPI REST 
 
 Start the FastAPI server:
 ```bash
-python -m app.main
+poetry run python -m app.main
 ```
 The server will be available at `http://localhost:8000`.
 - Dashboard: `http://localhost:8000/`
@@ -30,10 +28,24 @@ The server will be available at `http://localhost:8000`.
 
 The MCP server is designed for `stdio` transport in the current MVP. You can run it via:
 ```bash
-python -m app.mcp_server
+poetry run python -m app.mcp_server
 ```
 Or configure it in your LLM client (e.g., Claude Desktop) using the command:
-`python -m app.mcp_server`
+`poetry run python -m app.mcp_server`
+
+### OpenCode Configuration
+To connect to this MCP server in OpenCode, add the following to your `opencode.json` (or equivalent client config):
+```json
+{
+  "mcpServers": {
+    "agent-monitor": {
+      "command": "poetry",
+      "args": ["run", "python", "-m", "app.mcp_server"],
+      "cwd": "/Volumes/js_drive/Projects/agent-monitor-mcp"
+    }
+  }
+}
+```
 
 ### Available Tools
 - `report_status(agent_id, run_id, task_name, status, progress, message, metadata)`: Updates agent status.
@@ -44,7 +56,7 @@ Or configure it in your LLM client (e.g., Claude Desktop) using the command:
 
 To watch agent status from your terminal:
 ```bash
-python -m cli.monitor --interval 1
+poetry run python -m cli.monitor --interval 1
 ```
 
 Options:
@@ -101,7 +113,7 @@ As an MVP, this system has several limitations:
 
 ## Testing
 
-Run tests with pytest:
+Run tests with Poetry:
 ```bash
-pytest
+poetry run pytest
 ```
