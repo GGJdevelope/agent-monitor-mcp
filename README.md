@@ -2,6 +2,9 @@
 
 A hybrid monitoring system for agents with MCP status ingestion, a FastAPI REST API, and a browser dashboard.
 
+<img width="1580" height="459" alt="스크린샷 2026-03-20 오후 9 19 13" src="https://github.com/user-attachments/assets/72aced69-372d-4433-8d23-82bf087e676c" />
+
+
 ## Setup
 
 1. Install dependencies using Poetry:
