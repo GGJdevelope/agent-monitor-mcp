@@ -75,6 +75,20 @@ When executing tasks, use the `agent-monitor` MCP server to report your status:
 3. Call `report_status` with status="completed" or "failed" upon finishing.
 ```
 
+OR
+
+```markdown
+## 📊 Status Reporting (Mandatory)
+
+You must use the `agent-monitor` MCP tool to report status for every non-trivial user job. This is mandatory for transparency and orchestration.
+
+1.  **Start:** Immediately call `agent-monitor_report_status` with `status='running'`, `progress=0`, and a clear `message` describing the task.
+2.  **Updates:** Send progress updates (0-100) and messages after each major phase, delegation, or every few meaningful steps.
+3.  **Stalls:** If a task stalls or awaits user input, report it in the `message` while remaining `status='running'`.
+4.  **Finish:** Conclude with `status='completed'` or `status='failed'`.
+5.  **Required Fields:** Every call must include `agent_id`, `run_id` (must include the current branch name), `task_name`, `status`, `progress`, and `message`.
+```
+
 ## CLI Monitor
 
 To watch agent status from your terminal:
