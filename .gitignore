@@ -145,5 +145,10 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# SQLite runtime files
+agent_monitor.db
+agent_monitor.db-wal
+agent_monitor.db-shm
+
 # PyCharm
 .idea/

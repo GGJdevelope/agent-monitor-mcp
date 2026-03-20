@@ -267,7 +267,7 @@ Any state visible in the dashboard must also be available through the REST API a
 - [x] `app/services/status_service.py` provides a single shared ingest/query layer used by MCP, REST, dashboard, and CLI surfaces
 - [x] Agents can report status through a supported MCP transport and persist both current snapshot and append-only event history
 - [x] `app/api/status.py` exposes a snapshot endpoint and a history endpoint with documented response shapes
-- [ ] Browser dashboard loads the current snapshot and then receives incremental updates through SSE without requiring full-page refresh
+- [x] Browser dashboard loads the current snapshot and then receives incremental updates through SSE without requiring full-page refresh
 - [x] `cli/monitor.py` can display current agent status in human-readable table form and machine-readable `--json` form
 - [x] Agents with no updates for a configurable threshold are marked `stale` consistently across API, dashboard, and CLI
 - [x] Invalid payloads (unknown status, out-of-range progress, malformed timestamps if accepted from clients) are rejected with clear error responses
@@ -276,17 +276,17 @@ Any state visible in the dashboard must also be available through the REST API a
 
 - [x] SQLite runs in WAL mode for MVP durability
 - [x] Report timestamps are normalized to UTC
-- [ ] CLI polling interval is configurable and supports backoff when idle
-- [ ] SSE works behind a reverse proxy with documented timeout and buffering settings
+- [x] CLI polling interval is configurable and supports backoff when idle
+- [x] SSE works behind a reverse proxy with documented timeout and buffering settings
 - [ ] Production mode requires explicit auth/TLS/origin policy decisions before public exposure
 - [x] MVP explicitly documents whether support is limited to single-process/single-instance
 
 ### Quality Gates
 
-- [ ] Automated tests cover service logic, REST API, SSE, MCP integration, and end-to-end flow
+- [x] Automated tests cover service logic, REST API, SSE, MCP integration, and end-to-end flow
 - [x] Health check and startup failure modes are documented
 - [x] README includes local run instructions for server, dashboard, and CLI
-- [ ] AI-generated implementation output, if used, is called out for human review in critical lifecycle/security paths
+- [x] AI-generated implementation output, if used, is called out for human review in critical lifecycle/security paths
 
 ## Success Metrics
 

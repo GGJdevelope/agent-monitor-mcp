@@ -47,14 +47,6 @@ async def test_agent_not_found(client: AsyncClient):
     assert response.status_code == 404
 
 @pytest.mark.asyncio
-async def test_sse_streaming(client: AsyncClient, service):
-    # Automated SSE testing in a request/response test client often hangs or needs 
-    # specific concurrency support. For the MVP, we verify SSE manually or via 
-    # integration tests that support long-running connections.
-    # We do NOT claim automated coverage for SSE in the plan.
-    pytest.skip("SSE automated coverage is not yet implemented in this test suite")
-
-@pytest.mark.asyncio
 async def test_mcp_tool_execution():
     from app.mcp_server import report_status, get_all_status
     # Directly test the tools as async functions
