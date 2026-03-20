@@ -56,3 +56,6 @@ async def get_all_status() -> List[AgentState]:
 async def get_agent_status(agent_id: str) -> Optional[AgentState]:
     """Get the current status of a specific agent."""
     return get_service().get_agent_state(agent_id)
+
+if __name__ == "__main__":
+    mcp.run()

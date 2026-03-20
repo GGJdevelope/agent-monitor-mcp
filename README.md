@@ -5,11 +5,13 @@ A hybrid monitoring system for agents with MCP status ingestion, a FastAPI REST 
 ## Setup
 
 1. Install dependencies using Poetry:
+
    ```bash
    poetry install
    ```
 
 2. Configure environment variables (optional):
+
    ```bash
    cp .env.example .env
    ```
@@ -17,49 +19,72 @@ A hybrid monitoring system for agents with MCP status ingestion, a FastAPI REST 
 ## Running the Server
 
 Start the FastAPI server:
+
 ```bash
 poetry run python -m app.main
 ```
+
 The server will be available at `http://localhost:8000`.
+
 - Dashboard: `http://localhost:8000/`
 - API docs: `http://localhost:8000/docs/`
 
 ## MCP Server
 
 The MCP server is designed for `stdio` transport in the current MVP. You can run it via:
+
 ```bash
 poetry run python -m app.mcp_server
 ```
+
 Or configure it in your LLM client (e.g., Claude Desktop) using the command:
 `poetry run python -m app.mcp_server`
 
 ### OpenCode Configuration
+
 To connect to this MCP server in OpenCode, add the following to your `opencode.json` (or equivalent client config):
+
 ```json
 {
   "mcpServers": {
     "agent-monitor": {
-      "command": "poetry",
-      "args": ["run", "python", "-m", "app.mcp_server"],
-      "cwd": "/Volumes/js_drive/Projects/agent-monitor-mcp"
+      "type": "local",
+      "command": ["poetry","--directory","/path/to/agent-monitor-mcp", "run", "python", "-m", "app.mcp_server"],
+      "enabled": true
     }
   }
 }
 ```
 
 ### Available Tools
+
 - `report_status(agent_id, run_id, task_name, status, progress, message, metadata)`: Updates agent status.
 - `get_all_status()`: Returns current snapshots of all agents.
 - `get_agent_status(agent_id)`: Returns current snapshot of a specific agent.
 
+### Recommended Prompt for Primary Agents
+
+Primary or orchestrator agents should instruct subagents to call `report_status` when a task starts, during progress updates, on completion, and on failure. Use canonical lowercase status values: `running`, `completed`, `failed`, `cancelled`, or `queued`.
+
+The orchestrator can use `get_all_status()` or `get_agent_status(agent_id)` to monitor workers.
+
+```markdown
+When executing tasks, use the `agent-monitor` MCP server to report your status:
+1. Call `report_status` with status="running" when starting.
+2. Provide periodic updates with `progress` (0-100) and a `message`.
+3. Call `report_status` with status="completed" or "failed" upon finishing.
+```
+
 ## CLI Monitor
 
 To watch agent status from your terminal:
+
 ```bash
 poetry run python -m cli.monitor --interval 1
 ```
 
 Options:
+
 - `--once`: Fetch once and exit.
 - `--json`: Output raw JSON.
 - `--url`: Specify a different API URL.
@@ -97,6 +122,7 @@ When deploying behind a reverse proxy (like Nginx or Caddy), specific configurat
 ### Persistence Cleanup
 
 The application generates SQLite runtime files in the project root:
+
 - `agent_monitor.db`
 - `agent_monitor.db-wal`
 - `agent_monitor.db-shm`
@@ -106,6 +132,7 @@ These are excluded from version control via `.gitignore`. To reset the system st
 ## Limitations & Human Review
 
 As an MVP, this system has several limitations:
+
 - **No Built-in Auth**: Relies on external infrastructure for security.
 - **Single-Instance**: Designed for a single-process/single-instance deployment. SSE broadcasting is in-memory and not synchronized across multiple workers or processes.
 - **Manual Dashboard Verification**: While core logic and SSE streams are covered by automated tests, the final visual assembly of the dashboard UI requires manual verification.
@@ -114,6 +141,7 @@ As an MVP, this system has several limitations:
 ## Testing
 
 Run tests with Poetry:
+
 ```bash
 poetry run pytest
 ```
