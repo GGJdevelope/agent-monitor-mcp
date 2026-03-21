@@ -279,3 +279,49 @@ def test_location_label_compact(repository):
 
     state.working_dir = "/single"
     assert state.location_label == "single"
+
+def test_reserve_completion_notification_idempotent(repository):
+    instance_id = "test-notify-idempotent"
+    
+    # First call should return True (reserved)
+    assert repository.reserve_completion_notification(instance_id) is True
+    
+    # Second call should return False (already reserved)
+    assert repository.reserve_completion_notification(instance_id) is False
+
+def test_prune_orphaned_notifications(repository):
+    now = datetime.now(timezone.utc)
+    old_time = now - timedelta(seconds=100)
+    instance_id_stale = "inst-stale"
+    instance_id_fresh = "inst-fresh"
+
+    with repository._get_connection() as conn:
+        # Add a stale snapshot
+        conn.execute(
+            "INSERT INTO agent_current_status (instance_id, agent_id, run_id, task_name, status, progress, message, reported_at, first_seen_at, updated_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (instance_id_stale, "a", "r1", "t", "running", 10, "m", old_time.isoformat(), old_time.isoformat(), old_time.isoformat(), "{}")
+        )
+        # Add a fresh snapshot
+        conn.execute(
+            "INSERT INTO agent_current_status (instance_id, agent_id, run_id, task_name, status, progress, message, reported_at, first_seen_at, updated_at, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (instance_id_fresh, "a", "r2", "t", "running", 10, "m", now.isoformat(), now.isoformat(), now.isoformat(), "{}")
+        )
+        conn.commit()
+
+    # Reserve notifications for both
+    repository.reserve_completion_notification(instance_id_stale)
+    repository.reserve_completion_notification(instance_id_fresh)
+
+    # Prune with 50s retention
+    cutoff = now - timedelta(seconds=50)
+    results = repository.prune_expired_data(cutoff)
+
+    assert results["deleted_snapshots"] == 1
+    assert results["deleted_notifications"] == 1
+
+    # Verify stale notification is gone, fresh one remains
+    with repository._get_connection() as conn:
+        cursor = conn.execute("SELECT COUNT(*) FROM telegram_completion_notifications WHERE instance_id = ?", (instance_id_stale,))
+        assert cursor.fetchone()[0] == 0
+        cursor = conn.execute("SELECT COUNT(*) FROM telegram_completion_notifications WHERE instance_id = ?", (instance_id_fresh,))
+        assert cursor.fetchone()[0] == 1

@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     PORT: int = 8000
     STATUS_RETENTION_SECONDS: int = Field(default=0, ge=0)
 
+    # Telegram Notification Settings
+    TELEGRAM_BOT_TOKEN: str | None = None
+    TELEGRAM_CHAT_ID: str | None = None
+    TELEGRAM_PROGRESS_NOTIFY_ENABLED: bool = True
+
     model_config = {
         "env_file": ".env",
         "extra": "ignore"
