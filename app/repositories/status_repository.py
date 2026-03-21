@@ -71,6 +71,14 @@ class StatusRepository:
                 )
             """)
 
+            # Telegram notification markers
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS telegram_completion_notifications (
+                    instance_id TEXT PRIMARY KEY,
+                    sent_at TEXT NOT NULL
+                )
+            """)
+
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_events_instance_run ON agent_status_events (instance_id, run_id)"
             )
@@ -180,12 +188,22 @@ class StatusRepository:
                     )
                     deleted_snapshots = cursor.rowcount
 
+                    # Prune orphaned telegram notification markers
+                    cursor = conn.execute(
+                        """
+                        DELETE FROM telegram_completion_notifications 
+                        WHERE instance_id NOT IN (SELECT instance_id FROM agent_current_status)
+                        """
+                    )
+                    deleted_notifications = cursor.rowcount
+
             logger.info(
-                f"Pruned {deleted_events} events and {deleted_snapshots} snapshots"
+                f"Pruned {deleted_events} events, {deleted_snapshots} snapshots, and {deleted_notifications} notification markers"
             )
             return {
                 "deleted_events": deleted_events,
                 "deleted_snapshots": deleted_snapshots,
+                "deleted_notifications": deleted_notifications,
             }
         except sqlite3.Error as e:
             logger.error(f"Failed to prune expired agent data: {e}")
@@ -296,6 +314,24 @@ class StatusRepository:
                 )
                 for row in rows
             ]
+
+    def reserve_completion_notification(self, instance_id: str) -> bool:
+        """
+        Mark a completion notification as reserved/sent for an instance.
+        Returns True if this is the first time it's being reserved, False otherwise.
+        """
+        now = datetime.now(timezone.utc).isoformat()
+        try:
+            with self._get_connection() as conn:
+                conn.execute(
+                    "INSERT INTO telegram_completion_notifications (instance_id, sent_at) VALUES (?, ?)",
+                    (instance_id, now),
+                )
+                conn.commit()
+                return True
+        except sqlite3.IntegrityError:
+            # Already exists
+            return False
 
     def _row_to_state(self, row: sqlite3.Row) -> AgentState:
         return AgentState(

@@ -19,6 +19,28 @@ A hybrid monitoring system for agents with MCP status ingestion, a FastAPI REST 
    cp .env.example .env
    ```
 
+### Telegram Notifications
+
+The monitor can send notifications to a Telegram chat when an agent task completes.
+
+1. Create a bot using [@BotFather](https://t.me/botfather) and get the **Bot Token**.
+2. Get your **Chat ID** (you can use [@userinfobot](https://t.me/userinfobot)).
+3. Add the following to your `.env` file:
+   ```bash
+   TELEGRAM_BOT_TOKEN="your_bot_token"
+   TELEGRAM_CHAT_ID="your_chat_id"
+   TELEGRAM_PROGRESS_NOTIFY_ENABLED=true
+   ```
+
+**Completion Conditions:**
+A notification is triggered only when:
+- Status transitions to `completed`.
+- Progress is exactly `100`.
+- Both `branch` and `working_dir` are provided (non-blank).
+- A notification for that specific `instance_id` hasn't been sent yet.
+
+The system specifically notifies when the final `completed` status is reached at 100% progress. If an agent reports 100% progress while still `running` and later transitions to `completed`, it will notify upon that final transition. It avoids double-notifying if multiple `completed` updates are received for the same instance.
+
 ## Running the Server
 
 Start the FastAPI server:
@@ -133,6 +155,7 @@ The CLI monitor implements an adaptive backoff mechanism. If no semantic status 
 - **Hybrid Interface**: Shared service layer ensures consistency across MCP, REST, and the Web UI.
 - **Single-Instance Design**: The current MVP is designed for single-instance `stdio` transport. The service logic is shared but initialized independently for the MCP tool execution and the FastAPI web application to avoid fragile import-time global state.
 - **Adaptive CLI Polling**: The CLI monitor uses semantic change detection to back off polling frequency when status is idle.
+- **Telegram Notifications**: Optional synchronous Telegram notifications when an agent task completes (100% progress and `completed` status) on a specific branch and working directory.
 
 ## Deployment & Production Guidance
 
