@@ -133,7 +133,11 @@ The monitor uses an `instance_id` (explicit or synthesized) as the primary key f
 To watch agent status from your terminal:
 
 ```bash
+# Watch status with 1s interval
 poetry run python -m cli.monitor --interval 1
+
+# Only show the 5 most recently updated agents
+poetry run python -m cli.monitor --limit 5
 ```
 
 Options:
@@ -144,8 +148,15 @@ Options:
 - `--interval`: Initial polling interval in seconds (default: 2.0).
 - `--max-interval`: Maximum polling interval for backoff (default: 60.0).
 - `--backoff-factor`: Backoff multiplier when no changes detected (default: 1.5).
+- `--limit`: Limit the number of agents displayed (sorted by most recently updated).
 
-The CLI monitor implements an adaptive backoff mechanism. If no semantic status changes are detected between polls, it progressively increases the polling interval up to the `--max-interval`. Any change to an agent's status, progress, or message will immediately reset the interval to the base `--interval`.
+The CLI monitor provides a **calm summary-only view** by default, showing Location, Branch, Status, and Progress. 
+
+Key features:
+- **Clean Table**: Strictly displays the 4 most critical columns to reduce cognitive load.
+- **Privacy First**: The full working directory path is hidden in the summary view to protect local file structures. If a `location_label` is missing, a compact version is derived from the directory path (e.g., `parent/current`) instead of showing the full path.
+- **Adaptive Polling**: Implements an adaptive backoff mechanism. If no semantic status changes are detected, it increases polling interval. Backoff lines are suppressed in stable rendering for a cleaner experience.
+- **Identity Safety**: Uses internal `instance_id` (including `location_label`) to handle multiple agents with the same name across different branches or directories.
 
 ## Features
 
