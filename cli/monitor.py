@@ -38,6 +38,7 @@ def get_agent_fingerprint(data):
                 "instance_id": agent.get("instance_id"),
                 "agent_id": agent.get("agent_id"),
                 "branch": agent.get("branch"),
+                "location_label": agent.get("location_label"),
                 "working_dir": agent.get("working_dir"),
                 "task_name": agent.get("task_name"),
                 "status": agent.get("status"),
@@ -51,54 +52,60 @@ def get_agent_fingerprint(data):
     ).hexdigest()
 
 
-def format_table(data):
+def format_table(data, limit=None):
     if not isinstance(data, list):
         return data
 
-    table_data = []
-    for agent in data:
-        # Convert reported_at for readability
-        reported_at = agent.get("reported_at", "")
-        if reported_at:
-            try:
-                dt = datetime.fromisoformat(reported_at.replace("Z", "+00:00"))
-                reported_at = dt.strftime("%H:%M:%S")
-            except (ValueError, TypeError):
-                pass
+    # Copy data to avoid mutating caller state if we need to sort it
+    display_data = list(data)
+    total_agents = len(display_data)
 
+    # Sort data by updated_at descending (newest first)
+    # Default to reported_at if updated_at is missing, though API should provide it
+    display_data.sort(
+        key=lambda x: x.get("updated_at", x.get("reported_at", "")), reverse=True
+    )
+
+    if limit and limit > 0:
+        display_data = display_data[:limit]
+
+    table_data = []
+
+    for agent in display_data:
         # Use location_label if available, otherwise fallback
-        location = agent.get("location_label", "unknown")
-        if location == "unknown":
+        location = agent.get("location_label", "")
+        if not location:
             working_dir = agent.get("working_dir")
             if working_dir:
-                import os
+                # Derive a compact label from the path to preserve privacy boundary
+                parts = [p for p in working_dir.replace("\\", "/").split("/") if p]
+                if len(parts) >= 2:
+                    location = f"{parts[-2]}/{parts[-1]}"
+                elif parts:
+                    location = parts[-1]
+                else:
+                    location = "root"
+            else:
+                location = "unknown"
 
-                location = os.path.basename(working_dir.rstrip(os.sep)) or working_dir
+        row = [
+            location,
+            agent.get("branch", "-"),
+            agent.get("status"),
+            f"{agent.get('progress', 0)}%",
+        ]
 
-        table_data.append(
-            [
-                agent.get("agent_id"),
-                agent.get("branch", "-"),
-                location,
-                agent.get("task_name"),
-                agent.get("status"),
-                f"{agent.get('progress', 0)}%",
-                agent.get("message", ""),
-                reported_at,
-            ]
-        )
+        table_data.append(row)
 
-    headers = [
-        "Agent",
-        "Branch",
-        "Location",
-        "Task",
-        "Status",
-        "Progress",
-        "Message",
-        "Time (UTC)",
-    ]
-    return tabulate(table_data, headers=headers, tablefmt="grid")
+    headers = ["Location", "Branch", "Status", "Progress"]
+
+    if not table_data:
+        return "No active agents."
+
+    output = tabulate(table_data, headers=headers, tablefmt="grid")
+    if limit and total_agents > limit:
+        output += f"\nShowing {limit} of {total_agents} agents (use --limit to see more)"
+    return output
 
 
 def main():
@@ -126,8 +133,17 @@ def main():
         default=1.5,
         help="Backoff multiplier when no changes detected",
     )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=0,
+        help="Limit the number of agents displayed (sorted by updated_at descending)",
+    )
 
     args = parser.parse_args()
+
+    if args.limit and args.limit < 0:
+        parser.error("--limit must be a positive integer")
 
     current_interval = args.interval
     last_fingerprint = None
@@ -170,9 +186,11 @@ def main():
                     print(
                         f"Agent Monitor - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                     )
-                    if current_interval > args.interval:
-                        print(f"(Backing off: {current_interval:.1f}s interval)")
-                print(format_table(data))
+                    # Suppress noisy backoff lines in normal stable rendering unless there's an error
+                    # We'll only show it if it's the very first backoff or if we want to be very calm.
+                    # The requirement says "suppress noisy backoff lines in normal stable rendering"
+                
+                print(format_table(data, limit=args.limit))
 
             if args.once:
                 break

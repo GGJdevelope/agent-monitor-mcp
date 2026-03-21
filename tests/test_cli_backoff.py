@@ -81,6 +81,11 @@ def test_fingerprint_detects_semantic_changes():
 
     assert get_agent_fingerprint(data1) != get_agent_fingerprint(data2)
 
+def test_fingerprint_detects_location_label_changes():
+    data1 = [{"agent_id": "a1", "location_label": "loc1", "status": "idle"}]
+    data2 = [{"agent_id": "a1", "location_label": "loc2", "status": "idle"}]
+    assert get_agent_fingerprint(data1) != get_agent_fingerprint(data2)
+
 
 def test_fingerprint_handles_non_list_input():
     # Should be stable for strings/errors
