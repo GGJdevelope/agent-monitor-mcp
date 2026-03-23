@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agent Monitor Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
     <style>
         .custom-tooltip {
             position: fixed;
@@ -20,29 +25,57 @@
             display: none;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
+        .dark .custom-tooltip {
+            background: #374151;
+            border: 1px solid #4b5563;
+        }
     </style>
+    <script>
+        // Apply theme as early as possible to avoid flash
+        (function() {
+            const savedTheme = localStorage.getItem('dashboard-theme');
+            const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (savedTheme === 'dark' || (!savedTheme && systemDark)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        })();
+    </script>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen transition-colors duration-200">
     <div id="tooltip" class="custom-tooltip"></div>
     <div class="container mx-auto px-4 py-8">
-        <header class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-800">Agent Monitor Dashboard</h1>
-            <p class="text-gray-600">Real-time status of all active agents</p>
+        <header class="mb-8 flex justify-between items-start">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-100">Agent Monitor Dashboard</h1>
+                <p class="text-gray-600 dark:text-gray-400">Real-time status of all active agents</p>
+            </div>
+            <button id="theme-toggle" 
+                    class="p-2 rounded-lg bg-white dark:bg-gray-800 shadow-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    aria-label="Toggle dark mode">
+                <svg id="sun-icon" class="hidden dark:block w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9h-1m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <svg id="moon-icon" class="block dark:hidden w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                </svg>
+            </button>
         </header>
 
         <!-- Desktop View (Hidden on mobile) -->
-        <div class="hidden md:block bg-white shadow-md rounded-lg overflow-hidden">
+        <div class="hidden md:block bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
             <table class="min-w-full leading-normal">
                 <thead>
                     <tr>
-                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Agent ID</th>
-                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
-                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Branch</th>
-                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Run / Task</th>
-                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Progress</th>
-                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Message</th>
-                        <th class="px-3 py-2 border-b-2 border-gray-200 bg-gray-50 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Updated</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Agent ID</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Location</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Branch</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Run / Task</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Progress</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Last Message</th>
+                        <th class="px-3 py-2 border-b-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Updated</th>
                     </tr>
                 </thead>
                 <tbody id="agent-table-body">
@@ -109,13 +142,13 @@
 
         function getStatusColor(status) {
             switch (status.toLowerCase()) {
-                case 'queued': return 'bg-gray-200 text-gray-800';
-                case 'running': return 'bg-blue-100 text-blue-800';
-                case 'completed': return 'bg-green-100 text-green-800';
-                case 'failed': return 'bg-red-100 text-red-800';
-                case 'cancelled': return 'bg-yellow-100 text-yellow-800';
-                case 'stale': return 'bg-orange-100 text-orange-800';
-                default: return 'bg-gray-100 text-gray-800';
+                case 'queued': return 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+                case 'running': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300';
+                case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300';
+                case 'failed': return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300';
+                case 'cancelled': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300';
+                case 'stale': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300';
+                default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
             }
         }
 
@@ -174,8 +207,8 @@
             );
 
             if (agents.size === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="px-5 py-10 text-center text-gray-500">No agents reporting yet</td></tr>';
-                mobileContainer.innerHTML = '<div class="p-8 text-center text-gray-500 bg-white rounded-lg shadow-md">No agents reporting yet</div>';
+                tbody.innerHTML = '<tr><td colspan="8" class="px-5 py-10 text-center text-gray-500 dark:text-gray-400">No agents reporting yet</td></tr>';
+                mobileContainer.innerHTML = '<div class="p-8 text-center text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">No agents reporting yet</div>';
                 return;
             }
 
@@ -189,76 +222,76 @@
                 
                 // Desktop Table Row
                 const row = document.createElement('tr');
-                row.className = 'hover:bg-gray-50 transition-colors cursor-pointer';
+                row.className = 'hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer';
                 row.addEventListener('click', () => toggleDetails(instanceId));
                 
                 row.innerHTML = `
-                    <td class="px-3 py-3 border-b border-gray-200 text-sm">
-                        <p class="text-gray-900 whitespace-no-wrap font-mono truncate w-24" title="${escapeHtml(agent.agent_id)}">${escapeHtml(agent.agent_id)}</p>
+                    <td class="px-3 py-3 border-b border-gray-200 dark:border-gray-700 text-sm">
+                        <p class="text-gray-900 dark:text-gray-100 whitespace-no-wrap font-mono truncate w-24" title="${escapeHtml(agent.agent_id)}">${escapeHtml(agent.agent_id)}</p>
                     </td>
-                    <td class="px-3 py-3 border-b border-gray-200 text-sm">
-                        <p class="text-gray-900 whitespace-no-wrap" title="${escapeHtml(shortLocation)}">${escapeHtml(shortLocation)}</p>
+                    <td class="px-3 py-3 border-b border-gray-200 dark:border-gray-700 text-sm">
+                        <p class="text-gray-900 dark:text-gray-100 whitespace-no-wrap" title="${escapeHtml(shortLocation)}">${escapeHtml(shortLocation)}</p>
                     </td>
-                    <td class="px-3 py-3 border-b border-gray-200 text-sm">
-                        <span class="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">${escapeHtml(branchStr)}</span>
+                    <td class="px-3 py-3 border-b border-gray-200 dark:border-gray-700 text-sm">
+                        <span class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded text-xs">${escapeHtml(branchStr)}</span>
                     </td>
-                    <td class="px-3 py-3 border-b border-gray-200 text-sm">
-                        <p class="text-gray-900 font-bold truncate w-40 hover:text-blue-600 transition-colors" 
+                    <td class="px-3 py-3 border-b border-gray-200 dark:border-gray-700 text-sm">
+                        <p class="text-gray-900 dark:text-gray-100 font-bold truncate w-40 hover:text-blue-600 dark:hover:text-blue-400 transition-colors" 
                            onmouseenter="showTooltip(event, this.textContent)" 
                            onmouseleave="hideTooltip()">${escapeHtml(agent.task_name)}</p>
-                        <p class="text-gray-600 text-xs font-mono truncate w-24" title="${escapeHtml(agent.run_id)}">${escapeHtml(agent.run_id)}</p>
+                        <p class="text-gray-600 dark:text-gray-400 text-xs font-mono truncate w-24" title="${escapeHtml(agent.run_id)}">${escapeHtml(agent.run_id)}</p>
                     </td>
-                    <td class="px-3 py-3 border-b border-gray-200 text-sm">
+                    <td class="px-3 py-3 border-b border-gray-200 dark:border-gray-700 text-sm">
                         <span class="relative inline-block px-2 py-1 font-semibold leading-tight rounded-full text-xs ${getStatusColor(agent.status)}">
                             ${escapeHtml(agent.status)}
                         </span>
                     </td>
-                    <td class="px-3 py-3 border-b border-gray-200 text-sm">
-                        <div class="w-20 bg-gray-200 rounded-full h-2 mb-1">
-                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${progress}%"></div>
+                    <td class="px-3 py-3 border-b border-gray-200 dark:border-gray-700 text-sm">
+                        <div class="w-20 bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-1">
+                            <div class="bg-blue-600 dark:bg-blue-500 h-2 rounded-full" style="width: ${progress}%"></div>
                         </div>
-                        <p class="text-gray-600 text-xs">${progress}%</p>
+                        <p class="text-gray-600 dark:text-gray-400 text-xs">${progress}%</p>
                     </td>
-                    <td class="px-3 py-3 border-b border-gray-200 text-sm">
-                        <p class="text-gray-900 truncate w-48 hover:text-blue-600 transition-colors"
+                    <td class="px-3 py-3 border-b border-gray-200 dark:border-gray-700 text-sm">
+                        <p class="text-gray-900 dark:text-gray-100 truncate w-48 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                            onmouseenter="showTooltip(event, this.textContent)" 
                            onmouseleave="hideTooltip()">${escapeHtml(agent.message || '-')}</p>
                     </td>
-                    <td class="px-3 py-3 border-b border-gray-200 text-sm text-right">
-                        <p class="text-gray-900 whitespace-no-wrap text-xs">${timeStr}</p>
+                    <td class="px-3 py-3 border-b border-gray-200 dark:border-gray-700 text-sm text-right">
+                        <p class="text-gray-900 dark:text-gray-100 whitespace-no-wrap text-xs">${timeStr}</p>
                     </td>
                 `;
                 tbody.appendChild(row);
 
                 if (isExpanded) {
                     const detailsRow = document.createElement('tr');
-                    detailsRow.className = 'bg-gray-50 border-b border-gray-200';
+                    detailsRow.className = 'bg-gray-50 dark:bg-gray-900/30 border-b border-gray-200 dark:border-gray-700';
                     const details = instanceDetails.get(instanceId);
                     
                     if (details && !details.loading && !details.error) {
                         detailsRow.innerHTML = `
                             <td colspan="8" class="px-4 py-4">
                                 <div class="grid grid-cols-2 gap-4 text-sm">
-                                    <div><span class="font-bold text-gray-600">Instance ID:</span> <span class="font-mono">${escapeHtml(details.instance_id || 'N/A')}</span></div>
-                                    <div><span class="font-bold text-gray-600">Agent ID:</span> <span class="font-mono">${escapeHtml(details.agent_id)}</span></div>
-                                    <div><span class="font-bold text-gray-600">Working Dir:</span> <span class="break-all">${escapeHtml(details.working_dir || 'N/A')}</span></div>
-                                    <div><span class="font-bold text-gray-600">Branch:</span> <span>${escapeHtml(details.branch || 'N/A')}</span></div>
-                                    <div><span class="font-bold text-gray-600">Run ID:</span> <span class="font-mono">${escapeHtml(details.run_id)}</span></div>
-                                    <div><span class="font-bold text-gray-600">Task Name:</span> <span>${escapeHtml(details.task_name)}</span></div>
-                                    <div><span class="font-bold text-gray-600">First Seen:</span> <span>${details.first_seen_at ? new Date(details.first_seen_at).toLocaleString() : 'N/A'}</span></div>
-                                    <div><span class="font-bold text-gray-600">Updated At:</span> <span>${new Date(details.updated_at).toLocaleString()}</span></div>
+                                    <div><span class="font-bold text-gray-600 dark:text-gray-400">Instance ID:</span> <span class="font-mono text-gray-800 dark:text-gray-200">${escapeHtml(details.instance_id || 'N/A')}</span></div>
+                                    <div><span class="font-bold text-gray-600 dark:text-gray-400">Agent ID:</span> <span class="font-mono text-gray-800 dark:text-gray-200">${escapeHtml(details.agent_id)}</span></div>
+                                    <div><span class="font-bold text-gray-600 dark:text-gray-400">Working Dir:</span> <span class="break-all text-gray-800 dark:text-gray-200">${escapeHtml(details.working_dir || 'N/A')}</span></div>
+                                    <div><span class="font-bold text-gray-600 dark:text-gray-400">Branch:</span> <span class="text-gray-800 dark:text-gray-200">${escapeHtml(details.branch || 'N/A')}</span></div>
+                                    <div><span class="font-bold text-gray-600 dark:text-gray-400">Run ID:</span> <span class="font-mono text-gray-800 dark:text-gray-200">${escapeHtml(details.run_id)}</span></div>
+                                    <div><span class="font-bold text-gray-600 dark:text-gray-400">Task Name:</span> <span class="text-gray-800 dark:text-gray-200">${escapeHtml(details.task_name)}</span></div>
+                                    <div><span class="font-bold text-gray-600 dark:text-gray-400">First Seen:</span> <span class="text-gray-800 dark:text-gray-200">${details.first_seen_at ? new Date(details.first_seen_at).toLocaleString() : 'N/A'}</span></div>
+                                    <div><span class="font-bold text-gray-600 dark:text-gray-400">Updated At:</span> <span class="text-gray-800 dark:text-gray-200">${new Date(details.updated_at).toLocaleString()}</span></div>
                                 </div>
                             </td>
                         `;
                     } else if (details && details.error) {
                         detailsRow.innerHTML = `
-                            <td colspan="8" class="px-4 py-4 text-center text-red-500">
+                            <td colspan="8" class="px-4 py-4 text-center text-red-500 dark:text-red-400">
                                 Failed to load instance details
                             </td>
                         `;
                     } else {
                         detailsRow.innerHTML = `
-                            <td colspan="8" class="px-4 py-4 text-center text-gray-500">
+                            <td colspan="8" class="px-4 py-4 text-center text-gray-500 dark:text-gray-400">
                                 Loading details...
                             </td>
                         `;
@@ -268,64 +301,64 @@
 
                 // Mobile Card
                 const card = document.createElement('div');
-                card.className = 'bg-white shadow rounded-lg p-4 flex flex-col space-y-3';
+                card.className = 'bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col space-y-3 border border-gray-200 dark:border-gray-700';
                 
                 let detailsHtml = '';
                 if (isExpanded) {
                     const details = instanceDetails.get(instanceId);
                     if (details && !details.loading && !details.error) {
                         detailsHtml = `
-                            <div class="mt-3 pt-3 border-t border-gray-100 flex flex-col space-y-2 text-sm bg-gray-50 p-3 rounded">
-                                <div><span class="font-bold text-gray-600">Instance ID:</span> <span class="font-mono break-all">${escapeHtml(details.instance_id || 'N/A')}</span></div>
-                                <div><span class="font-bold text-gray-600">Agent ID:</span> <span class="font-mono">${escapeHtml(details.agent_id)}</span></div>
-                                <div><span class="font-bold text-gray-600">Working Dir:</span> <span class="break-all">${escapeHtml(details.working_dir || 'N/A')}</span></div>
-                                <div><span class="font-bold text-gray-600">Branch:</span> <span>${escapeHtml(details.branch || 'N/A')}</span></div>
-                                <div><span class="font-bold text-gray-600">Run ID:</span> <span class="font-mono">${escapeHtml(details.run_id)}</span></div>
-                                <div><span class="font-bold text-gray-600">Task Name:</span> <span>${escapeHtml(details.task_name)}</span></div>
-                                <div><span class="font-bold text-gray-600">First Seen:</span> <span>${details.first_seen_at ? new Date(details.first_seen_at).toLocaleString() : 'N/A'}</span></div>
-                                <div><span class="font-bold text-gray-600">Updated At:</span> <span>${new Date(details.updated_at).toLocaleString()}</span></div>
+                            <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex flex-col space-y-2 text-sm bg-gray-50 dark:bg-gray-900/50 p-3 rounded">
+                                <div><span class="font-bold text-gray-600 dark:text-gray-400">Instance ID:</span> <span class="font-mono break-all text-gray-800 dark:text-gray-200">${escapeHtml(details.instance_id || 'N/A')}</span></div>
+                                <div><span class="font-bold text-gray-600 dark:text-gray-400">Agent ID:</span> <span class="font-mono text-gray-800 dark:text-gray-200">${escapeHtml(details.agent_id)}</span></div>
+                                <div><span class="font-bold text-gray-600 dark:text-gray-400">Working Dir:</span> <span class="break-all text-gray-800 dark:text-gray-200">${escapeHtml(details.working_dir || 'N/A')}</span></div>
+                                <div><span class="font-bold text-gray-600 dark:text-gray-400">Branch:</span> <span class="text-gray-800 dark:text-gray-200">${escapeHtml(details.branch || 'N/A')}</span></div>
+                                <div><span class="font-bold text-gray-600 dark:text-gray-400">Run ID:</span> <span class="font-mono text-gray-800 dark:text-gray-200">${escapeHtml(details.run_id)}</span></div>
+                                <div><span class="font-bold text-gray-600 dark:text-gray-400">Task Name:</span> <span class="text-gray-800 dark:text-gray-200">${escapeHtml(details.task_name)}</span></div>
+                                <div><span class="font-bold text-gray-600 dark:text-gray-400">First Seen:</span> <span class="text-gray-800 dark:text-gray-200">${details.first_seen_at ? new Date(details.first_seen_at).toLocaleString() : 'N/A'}</span></div>
+                                <div><span class="font-bold text-gray-600 dark:text-gray-400">Updated At:</span> <span class="text-gray-800 dark:text-gray-200">${new Date(details.updated_at).toLocaleString()}</span></div>
                             </div>
                         `;
                     } else if (details && details.error) {
-                        detailsHtml = `<div class="mt-3 text-sm text-red-500 text-center bg-red-50 p-2 rounded">Failed to load details</div>`;
+                        detailsHtml = `<div class="mt-3 text-sm text-red-500 dark:text-red-400 text-center bg-red-50 dark:bg-red-900/20 p-2 rounded">Failed to load details</div>`;
                     } else {
-                        detailsHtml = `<div class="mt-3 text-sm text-gray-500 text-center p-2">Loading details...</div>`;
+                        detailsHtml = `<div class="mt-3 text-sm text-gray-500 dark:text-gray-400 text-center p-2">Loading details...</div>`;
                     }
                 }
 
                 card.innerHTML = `
                     <div class="flex justify-between items-start">
                         <div class="flex flex-col">
-                            <span class="text-sm font-mono text-gray-800 font-bold">${escapeHtml(agent.agent_id)}</span>
+                            <span class="text-sm font-mono text-gray-800 dark:text-gray-100 font-bold">${escapeHtml(agent.agent_id)}</span>
                             <div class="flex items-center space-x-2 mt-2">
                                 <span class="relative inline-block px-2 py-1 font-semibold leading-tight rounded-full text-xs ${getStatusColor(agent.status)}">${escapeHtml(agent.status)}</span>
-                                <span class="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs truncate max-w-[120px]" title="${escapeHtml(branchStr)}">${escapeHtml(branchStr)}</span>
+                                <span class="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded text-xs truncate max-w-[120px]" title="${escapeHtml(branchStr)}">${escapeHtml(branchStr)}</span>
                             </div>
                         </div>
-                        <span class="text-xs text-gray-500 font-medium">${timeStr}</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400 font-medium">${timeStr}</span>
                     </div>
 
-                    <div class="text-sm text-gray-800 space-y-2 mt-3">
-                        <div class="flex"><span class="font-semibold text-gray-600 w-20 flex-shrink-0">Location:</span> <span class="truncate">${escapeHtml(shortLocation)}</span></div>
-                        <div class="flex"><span class="font-semibold text-gray-600 w-20 flex-shrink-0">Task:</span> <span class="break-words">${escapeHtml(agent.task_name)}</span></div>
-                        <div class="flex"><span class="font-semibold text-gray-600 w-20 flex-shrink-0">Run ID:</span> <span class="text-xs font-mono text-gray-500 truncate mt-0.5">${escapeHtml(agent.run_id)}</span></div>
+                    <div class="text-sm text-gray-800 dark:text-gray-200 space-y-2 mt-3">
+                        <div class="flex"><span class="font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">Location:</span> <span class="truncate">${escapeHtml(shortLocation)}</span></div>
+                        <div class="flex"><span class="font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">Task:</span> <span class="break-words">${escapeHtml(agent.task_name)}</span></div>
+                        <div class="flex"><span class="font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">Run ID:</span> <span class="text-xs font-mono text-gray-500 dark:text-gray-400 truncate mt-0.5">${escapeHtml(agent.run_id)}</span></div>
                         <div class="flex items-center pt-1">
-                            <span class="font-semibold text-gray-600 w-20 flex-shrink-0">Progress:</span>
+                            <span class="font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">Progress:</span>
                             <div class="flex-1 flex items-center space-x-2">
-                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                    <div class="bg-blue-600 h-2 rounded-full" style="width: ${progress}%"></div>
+                                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                    <div class="bg-blue-600 dark:bg-blue-500 h-2 rounded-full" style="width: ${progress}%"></div>
                                 </div>
-                                <span class="text-xs text-gray-600 w-8 text-right">${progress}%</span>
+                                <span class="text-xs text-gray-600 dark:text-gray-400 w-8 text-right">${progress}%</span>
                             </div>
                         </div>
                         <div class="flex pt-1">
-                            <span class="font-semibold text-gray-600 w-20 flex-shrink-0">Message:</span> 
-                            <span class="break-words text-gray-700">${escapeHtml(agent.message || '-')}</span>
+                            <span class="font-semibold text-gray-600 dark:text-gray-400 w-20 flex-shrink-0">Message:</span> 
+                            <span class="break-words text-gray-700 dark:text-gray-300">${escapeHtml(agent.message || '-')}</span>
                         </div>
                     </div>
 
-                    <div class="pt-3 mt-3 border-t border-gray-100 flex justify-end">
-                        <button class="details-btn text-blue-600 text-sm font-medium focus:outline-none px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded transition-colors">
+                    <div class="pt-3 mt-3 border-t border-gray-100 dark:border-gray-700 flex justify-end">
+                        <button class="details-btn text-blue-600 dark:text-blue-400 text-sm font-medium focus:outline-none px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded transition-colors">
                             ${isExpanded ? 'Hide Details' : 'Show Details'}
                         </button>
                     </div>
@@ -369,6 +402,13 @@
 
         fetchInitialState();
         connectSSE();
+
+        // Theme toggle logic
+        const themeToggle = document.getElementById('theme-toggle');
+        themeToggle.addEventListener('click', () => {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('dashboard-theme', isDark ? 'dark' : 'light');
+        });
     </script>
 </body>
 </html>
