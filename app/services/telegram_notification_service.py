@@ -32,6 +32,7 @@ class TelegramNotificationService:
         timestamp: datetime
     ) -> bool:
         if not self._is_configured():
+            logger.info(f"Telegram notification skipped (enabled={self.enabled}, bot_token={'set' if self.bot_token else 'missing'}, chat_id={'set' if self.chat_id else 'missing'})")
             return False
 
         message = (
@@ -44,6 +45,8 @@ class TelegramNotificationService:
             f"<b>Time:</b> {timestamp.strftime('%Y-%m-%d %H:%M:%S')} UTC"
         )
 
+        logger.info(f"Sending Telegram notification for instance_id={instance_id}, agent={agent_id}, task={task_name}")
+
         url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
         payload = {
             "chat_id": self.chat_id,
@@ -54,7 +57,11 @@ class TelegramNotificationService:
         try:
             response = requests.post(url, json=payload, timeout=self.timeout)
             response.raise_for_status()
+            logger.info(f"Successfully sent Telegram notification for instance_id={instance_id}")
             return True
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"Failed to send Telegram notification (HTTP {e.response.status_code}): {e.response.text}")
+            return False
         except Exception as e:
             logger.error(f"Failed to send Telegram notification: {e}")
             return False

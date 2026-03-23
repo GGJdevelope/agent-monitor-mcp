@@ -30,7 +30,8 @@
             <p class="text-gray-600">Real-time status of all active agents</p>
         </header>
 
-        <div class="bg-white shadow-md rounded-lg overflow-hidden">
+        <!-- Desktop View (Hidden on mobile) -->
+        <div class="hidden md:block bg-white shadow-md rounded-lg overflow-hidden">
             <table class="min-w-full leading-normal">
                 <thead>
                     <tr>
@@ -49,13 +50,35 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Mobile View (Hidden on md and larger) -->
+        <div id="agent-cards-container" class="md:hidden space-y-4">
+            <!-- Data populated by JS -->
+        </div>
     </div>
 
     <script>
         const agents = new Map();
         const expandedRows = new Set();
         const instanceDetails = new Map();
+        const abortControllers = new Map();
         const tooltip = document.getElementById('tooltip');
+
+        function clampProgress(progress) {
+            const val = parseFloat(progress);
+            if (isNaN(val)) return 0;
+            return Math.min(Math.max(val, 0), 100);
+        }
+
+        function escapeHtml(unsafe) {
+            if (unsafe == null) return '';
+            return String(unsafe)
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
 
         function showTooltip(event, text) {
             if (!text || text === '-') return;
@@ -99,14 +122,26 @@
         async function toggleDetails(instanceId) {
             if (expandedRows.has(instanceId)) {
                 expandedRows.delete(instanceId);
+                // Abort any pending request for this instance when collapsing
+                if (abortControllers.has(instanceId)) {
+                    abortControllers.get(instanceId).abort();
+                    abortControllers.delete(instanceId);
+                }
                 renderAgents();
             } else {
                 expandedRows.add(instanceId);
                 instanceDetails.set(instanceId, { loading: true });
                 renderAgents();
                 
+                // Abort any previous request for this instance
+                if (abortControllers.has(instanceId)) {
+                    abortControllers.get(instanceId).abort();
+                }
+                const controller = new AbortController();
+                abortControllers.set(instanceId, controller);
+
                 try {
-                    const response = await fetch(`/api/agents/instances/${instanceId}`);
+                    const response = await fetch(`/api/agents/instances/${instanceId}`, { signal: controller.signal });
                     if (response.ok) {
                         const details = await response.json();
                         instanceDetails.set(instanceId, details);
@@ -114,16 +149,25 @@
                         instanceDetails.set(instanceId, { error: true });
                     }
                 } catch (err) {
+                    if (err.name === 'AbortError') return;
                     console.error("Failed to fetch instance details", err);
                     instanceDetails.set(instanceId, { error: true });
+                } finally {
+                    if (abortControllers.get(instanceId) === controller) {
+                        abortControllers.delete(instanceId);
+                    }
                 }
                 renderAgents();
             }
         }
 
         function renderAgents() {
+            hideTooltip();
             const tbody = document.getElementById('agent-table-body');
+            const mobileContainer = document.getElementById('agent-cards-container');
+            
             tbody.innerHTML = '';
+            mobileContainer.innerHTML = '';
             
             const sortedAgents = Array.from(agents.values()).sort((a, b) => 
                 new Date(b.updated_at) - new Date(a.updated_at)
@@ -131,50 +175,54 @@
 
             if (agents.size === 0) {
                 tbody.innerHTML = '<tr><td colspan="8" class="px-5 py-10 text-center text-gray-500">No agents reporting yet</td></tr>';
+                mobileContainer.innerHTML = '<div class="p-8 text-center text-gray-500 bg-white rounded-lg shadow-md">No agents reporting yet</div>';
                 return;
             }
 
             sortedAgents.forEach(agent => {
-                const row = document.createElement('tr');
-                row.className = 'hover:bg-gray-50 transition-colors cursor-pointer';
                 const instanceId = agent.instance_id || agent.agent_id;
-                row.onclick = () => toggleDetails(instanceId);
-                
                 const timeStr = new Date(agent.updated_at).toLocaleTimeString();
                 const shortLocation = agent.location_label || '-';
                 const branchStr = agent.branch || '-';
+                const isExpanded = expandedRows.has(instanceId);
+                const progress = clampProgress(agent.progress);
+                
+                // Desktop Table Row
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50 transition-colors cursor-pointer';
+                row.addEventListener('click', () => toggleDetails(instanceId));
                 
                 row.innerHTML = `
                     <td class="px-3 py-3 border-b border-gray-200 text-sm">
-                        <p class="text-gray-900 whitespace-no-wrap font-mono truncate w-24" title="${agent.agent_id}">${agent.agent_id}</p>
+                        <p class="text-gray-900 whitespace-no-wrap font-mono truncate w-24" title="${escapeHtml(agent.agent_id)}">${escapeHtml(agent.agent_id)}</p>
                     </td>
                     <td class="px-3 py-3 border-b border-gray-200 text-sm">
-                        <p class="text-gray-900 whitespace-no-wrap" title="${shortLocation}">${shortLocation}</p>
+                        <p class="text-gray-900 whitespace-no-wrap" title="${escapeHtml(shortLocation)}">${escapeHtml(shortLocation)}</p>
                     </td>
                     <td class="px-3 py-3 border-b border-gray-200 text-sm">
-                        <span class="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">${branchStr}</span>
+                        <span class="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">${escapeHtml(branchStr)}</span>
                     </td>
                     <td class="px-3 py-3 border-b border-gray-200 text-sm">
                         <p class="text-gray-900 font-bold truncate w-40 hover:text-blue-600 transition-colors" 
                            onmouseenter="showTooltip(event, this.textContent)" 
-                           onmouseleave="hideTooltip()">${agent.task_name}</p>
-                        <p class="text-gray-600 text-xs font-mono truncate w-24" title="${agent.run_id}">${agent.run_id}</p>
+                           onmouseleave="hideTooltip()">${escapeHtml(agent.task_name)}</p>
+                        <p class="text-gray-600 text-xs font-mono truncate w-24" title="${escapeHtml(agent.run_id)}">${escapeHtml(agent.run_id)}</p>
                     </td>
                     <td class="px-3 py-3 border-b border-gray-200 text-sm">
                         <span class="relative inline-block px-2 py-1 font-semibold leading-tight rounded-full text-xs ${getStatusColor(agent.status)}">
-                            ${agent.status}
+                            ${escapeHtml(agent.status)}
                         </span>
                     </td>
                     <td class="px-3 py-3 border-b border-gray-200 text-sm">
                         <div class="w-20 bg-gray-200 rounded-full h-2 mb-1">
-                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${agent.progress}%"></div>
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: ${progress}%"></div>
                         </div>
-                        <p class="text-gray-600 text-xs">${agent.progress}%</p>
+                        <p class="text-gray-600 text-xs">${progress}%</p>
                     </td>
                     <td class="px-3 py-3 border-b border-gray-200 text-sm">
                         <p class="text-gray-900 truncate w-48 hover:text-blue-600 transition-colors"
                            onmouseenter="showTooltip(event, this.textContent)" 
-                           onmouseleave="hideTooltip()">${agent.message || '-'}</p>
+                           onmouseleave="hideTooltip()">${escapeHtml(agent.message || '-')}</p>
                     </td>
                     <td class="px-3 py-3 border-b border-gray-200 text-sm text-right">
                         <p class="text-gray-900 whitespace-no-wrap text-xs">${timeStr}</p>
@@ -182,7 +230,7 @@
                 `;
                 tbody.appendChild(row);
 
-                if (expandedRows.has(instanceId)) {
+                if (isExpanded) {
                     const detailsRow = document.createElement('tr');
                     detailsRow.className = 'bg-gray-50 border-b border-gray-200';
                     const details = instanceDetails.get(instanceId);
@@ -191,12 +239,12 @@
                         detailsRow.innerHTML = `
                             <td colspan="8" class="px-4 py-4">
                                 <div class="grid grid-cols-2 gap-4 text-sm">
-                                    <div><span class="font-bold text-gray-600">Instance ID:</span> <span class="font-mono">${details.instance_id || 'N/A'}</span></div>
-                                    <div><span class="font-bold text-gray-600">Agent ID:</span> <span class="font-mono">${details.agent_id}</span></div>
-                                    <div><span class="font-bold text-gray-600">Working Dir:</span> <span class="break-all">${details.working_dir || 'N/A'}</span></div>
-                                    <div><span class="font-bold text-gray-600">Branch:</span> <span>${details.branch || 'N/A'}</span></div>
-                                    <div><span class="font-bold text-gray-600">Run ID:</span> <span class="font-mono">${details.run_id}</span></div>
-                                    <div><span class="font-bold text-gray-600">Task Name:</span> <span>${details.task_name}</span></div>
+                                    <div><span class="font-bold text-gray-600">Instance ID:</span> <span class="font-mono">${escapeHtml(details.instance_id || 'N/A')}</span></div>
+                                    <div><span class="font-bold text-gray-600">Agent ID:</span> <span class="font-mono">${escapeHtml(details.agent_id)}</span></div>
+                                    <div><span class="font-bold text-gray-600">Working Dir:</span> <span class="break-all">${escapeHtml(details.working_dir || 'N/A')}</span></div>
+                                    <div><span class="font-bold text-gray-600">Branch:</span> <span>${escapeHtml(details.branch || 'N/A')}</span></div>
+                                    <div><span class="font-bold text-gray-600">Run ID:</span> <span class="font-mono">${escapeHtml(details.run_id)}</span></div>
+                                    <div><span class="font-bold text-gray-600">Task Name:</span> <span>${escapeHtml(details.task_name)}</span></div>
                                     <div><span class="font-bold text-gray-600">First Seen:</span> <span>${details.first_seen_at ? new Date(details.first_seen_at).toLocaleString() : 'N/A'}</span></div>
                                     <div><span class="font-bold text-gray-600">Updated At:</span> <span>${new Date(details.updated_at).toLocaleString()}</span></div>
                                 </div>
@@ -217,6 +265,78 @@
                     }
                     tbody.appendChild(detailsRow);
                 }
+
+                // Mobile Card
+                const card = document.createElement('div');
+                card.className = 'bg-white shadow rounded-lg p-4 flex flex-col space-y-3';
+                
+                let detailsHtml = '';
+                if (isExpanded) {
+                    const details = instanceDetails.get(instanceId);
+                    if (details && !details.loading && !details.error) {
+                        detailsHtml = `
+                            <div class="mt-3 pt-3 border-t border-gray-100 flex flex-col space-y-2 text-sm bg-gray-50 p-3 rounded">
+                                <div><span class="font-bold text-gray-600">Instance ID:</span> <span class="font-mono break-all">${escapeHtml(details.instance_id || 'N/A')}</span></div>
+                                <div><span class="font-bold text-gray-600">Agent ID:</span> <span class="font-mono">${escapeHtml(details.agent_id)}</span></div>
+                                <div><span class="font-bold text-gray-600">Working Dir:</span> <span class="break-all">${escapeHtml(details.working_dir || 'N/A')}</span></div>
+                                <div><span class="font-bold text-gray-600">Branch:</span> <span>${escapeHtml(details.branch || 'N/A')}</span></div>
+                                <div><span class="font-bold text-gray-600">Run ID:</span> <span class="font-mono">${escapeHtml(details.run_id)}</span></div>
+                                <div><span class="font-bold text-gray-600">Task Name:</span> <span>${escapeHtml(details.task_name)}</span></div>
+                                <div><span class="font-bold text-gray-600">First Seen:</span> <span>${details.first_seen_at ? new Date(details.first_seen_at).toLocaleString() : 'N/A'}</span></div>
+                                <div><span class="font-bold text-gray-600">Updated At:</span> <span>${new Date(details.updated_at).toLocaleString()}</span></div>
+                            </div>
+                        `;
+                    } else if (details && details.error) {
+                        detailsHtml = `<div class="mt-3 text-sm text-red-500 text-center bg-red-50 p-2 rounded">Failed to load details</div>`;
+                    } else {
+                        detailsHtml = `<div class="mt-3 text-sm text-gray-500 text-center p-2">Loading details...</div>`;
+                    }
+                }
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex flex-col">
+                            <span class="text-sm font-mono text-gray-800 font-bold">${escapeHtml(agent.agent_id)}</span>
+                            <div class="flex items-center space-x-2 mt-2">
+                                <span class="relative inline-block px-2 py-1 font-semibold leading-tight rounded-full text-xs ${getStatusColor(agent.status)}">${escapeHtml(agent.status)}</span>
+                                <span class="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs truncate max-w-[120px]" title="${escapeHtml(branchStr)}">${escapeHtml(branchStr)}</span>
+                            </div>
+                        </div>
+                        <span class="text-xs text-gray-500 font-medium">${timeStr}</span>
+                    </div>
+
+                    <div class="text-sm text-gray-800 space-y-2 mt-3">
+                        <div class="flex"><span class="font-semibold text-gray-600 w-20 flex-shrink-0">Location:</span> <span class="truncate">${escapeHtml(shortLocation)}</span></div>
+                        <div class="flex"><span class="font-semibold text-gray-600 w-20 flex-shrink-0">Task:</span> <span class="break-words">${escapeHtml(agent.task_name)}</span></div>
+                        <div class="flex"><span class="font-semibold text-gray-600 w-20 flex-shrink-0">Run ID:</span> <span class="text-xs font-mono text-gray-500 truncate mt-0.5">${escapeHtml(agent.run_id)}</span></div>
+                        <div class="flex items-center pt-1">
+                            <span class="font-semibold text-gray-600 w-20 flex-shrink-0">Progress:</span>
+                            <div class="flex-1 flex items-center space-x-2">
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-blue-600 h-2 rounded-full" style="width: ${progress}%"></div>
+                                </div>
+                                <span class="text-xs text-gray-600 w-8 text-right">${progress}%</span>
+                            </div>
+                        </div>
+                        <div class="flex pt-1">
+                            <span class="font-semibold text-gray-600 w-20 flex-shrink-0">Message:</span> 
+                            <span class="break-words text-gray-700">${escapeHtml(agent.message || '-')}</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-3 mt-3 border-t border-gray-100 flex justify-end">
+                        <button class="details-btn text-blue-600 text-sm font-medium focus:outline-none px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded transition-colors">
+                            ${isExpanded ? 'Hide Details' : 'Show Details'}
+                        </button>
+                    </div>
+
+                    ${detailsHtml}
+                `;
+                
+                const detailsBtn = card.querySelector('.details-btn');
+                detailsBtn.addEventListener('click', () => toggleDetails(instanceId));
+
+                mobileContainer.appendChild(card);
             });
         }
 
